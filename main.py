@@ -9,10 +9,10 @@ def calculate_g(i, y, z):
     """eq. 1"""
 
     if i != y:
-        ret = w[i,y,z] / sum( [ (w[i,j,z] + w[j,i,z]) for j in NB(i) ] )
+        ret = w[i,y,z] / sum( w[i,j,z] + w[j,i,z] for j in NB(i) )
         return ret
     else:
-        ret = sum( [ w[j,i,z] for j in NB(i) ] ) / sum( [ (w[i,j,z] + w[j,i,z]) for j in NB(i) ] )
+        ret = sum( w[j,i,z] for j in NB(i) ) / sum( w[i,j,z] + w[j,i,z] for j in NB(i) )
         return ret
 
 def calculate_b(i,j,z):
@@ -20,7 +20,7 @@ def calculate_b(i,j,z):
     
     _a = g[i,j,z]
     _b = sum( [ g[i,k,z] for k in NB(i) + [i] ] )
-    return _a #/_b #-1. * np.log( _a / _b  )
+    return np.log( _a / _b  )
 
 def update_r(i,j,z):
     """eq. 5"""
@@ -31,19 +31,19 @@ def update_r(i,j,z):
 def update_a6(j, z):
     """eq. 6 & 7"""
     
-#    ret = max(  min(r[k,j,z], 0.) for k in NB(j) )
-    ret = sum([max(r[k,j,z], 0) for k in NB(j)] )
+    ret = max(  min(r[k,j,z], 0.) for k in NB(j) )
+#    ret = sum([max(r[k,j,z], 0) for k in NB(j)] )
     return ret
 
 def update_a7(i,j,z):
 
     if i in NB(j):
-#        _a = max( r[j,j,z], 0. )
-#        _b1 = min( r[j,j,z], 0. )
-#        _b2 = max( [ min( r[k,j,z], 0. ) for k in NB(j) if k != i ] )
-#        _b = 0. - _b1 - _b2
+        _a = max( r[j,j,z], 0. )
+        _b1 = min( r[j,j,z], 0. )
+        _b2 = max( [ min( r[k,j,z], 0. ) for k in NB(j) if k != i ] )
+        _b = 0. - _b1 - _b2
 
-        np.min( 0, [ r[j,j,z]] )
+#        np.min( 0, [ r[j,j,z]] )
 
         return min(_a, _b)
 
@@ -64,16 +64,14 @@ degree = 3
 print "Generate random graph."
 G = nx.random_regular_graph(degree, N)
 for i,j in G.edges():
-    G[i][j]['weight'] = random.randint(1,10)
+    G[i][j]['weight'] = random.random()
 
 print "Generate alpha & theta"
 alpha = nx.to_numpy_matrix(G)
+theta_ = np.random.rand(N,Z)
 theta = np.zeros((N,Z))
 for i in xrange(N):
-    for z in xrange(Z):
-        theta[i,z] = random.random()
-
-#np.random.rand(N, Z)
+    theta[i,:] = np.array([theta_[i,j]/np.sum(theta_[i,:]) for j in xrange(Z)])
 
 print "Generate w"
 w = np.zeros((N, N, Z))
@@ -103,7 +101,7 @@ print np.min(b)
 print np.mean(b)
 print np.max(b)
 
-for i in xrange(5):
+for i in xrange(3):
 
     print "="*40
     print "iteration {0}".format(i)
