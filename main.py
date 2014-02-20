@@ -242,3 +242,5 @@ if __name__ == '__main__':
             f.write( "\t".join([ str(i)] + 
                                [ str(theta[i,z]) 
                                   for z in xrange(Z) ]) + "\n")
+                                  
+    # TODO: pruning networks
