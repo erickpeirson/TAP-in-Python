@@ -19,7 +19,8 @@ def calculate_g(i, y, z):
         ret = w[i,y,z] / sum( w[i,j,z] + w[j,i,z] for j in NB(i) )
         return ret
     else:
-        ret = sum( w[j,i,z] for j in NB(i) ) / sum( w[i,j,z] + w[j,i,z] for j in NB(i) )
+        ret = sum( w[j,i,z] for j in NB(i) ) / sum( w[i,j,z] + w[j,i,z] 
+                                                                for j in NB(i) )
         return ret
 
 def calculate_b(i,j,z):
@@ -112,6 +113,7 @@ if __name__ == '__main__':
     from vsm.model import ldacgsmulti
     import tethne.networks as nt
     import pickle
+    import math
 
     # Load topic modeling results.
     modelpath = "/Users/erickpeirson/Dropbox/DigitalHPS/ED Journals/models/20131208_LSA_Gibbs_EvoDevo.npz"
@@ -119,6 +121,7 @@ if __name__ == '__main__':
     Z = 40
     
     # Build a coauthorship network.
+    print "Build a coauthorship network."
     papers = pickle.load(open("/Users/erickpeirson/Dropbox/DigitalHPS/ED Journals/models/20131208_papers.pickle", "r"))
     G = nt.authors.coauthors(papers, edge_attribs=['wosid'])
     
@@ -131,22 +134,24 @@ if __name__ == '__main__':
     
     #   Looking only at the largest connected component, for now.
     G = nx.connected_component_subgraphs(G)[0]
+    N = len(G.nodes())
     
     # Build theta = { P(topic|author) } matrix.
+    print "Build theta = { P(topic|author) } matrix."
     theta = np.zeros((N, Z))
     at = {}
     
     #   Get representation of each topic in each author's papers.
     for q in xrange(len(papers)):
-    p = papers[q]
-    pa = [ ' '.join([p['aulast'][i], p['auinit'][i]]) 
-            for i in xrange(len(p['aulast'])) ]
-    for a in pa:
-        if a in G.nodes():
-            try:
-                at[a].append(l.doc_top[q,:])
-            except KeyError:
-                at[a] = [ l.doc_top[q,:] ]
+        p = papers[q]
+        pa = [ ' '.join([p['aulast'][i], p['auinit'][i]]) 
+                for i in xrange(len(p['aulast'])) ]
+        for a in pa:
+            if a in G.nodes():
+                try:
+                    at[a].append(l.doc_top[q,:])
+                except KeyError:
+                    at[a] = [ l.doc_top[q,:] ]
 
     #   Now generate the P(t|a) matrix.
     q = 0
@@ -164,6 +169,7 @@ if __name__ == '__main__':
         q+=1
         
     # Re-index coauthorship graph.
+    print "Re-index coauthorship graph."
     G_ = nx.Graph()
     adict = {}
     adict_ = {}
@@ -188,6 +194,7 @@ if __name__ == '__main__':
     alpha = nx.to_numpy_matrix(G)
     
     # Calculate w_ij
+    print "Calculate w_ij"
     w = np.zeros((N, N, Z))
     for i,j in G.edges():
         for z in xrange(Z):
@@ -195,6 +202,7 @@ if __name__ == '__main__':
             w[j,i,z] = calculate_w(j,i,z)
             
     # 1.1 Calculate the node feature function g(v_i, y_i, z).
+    print "1.1 Calculate the node feature function g(v_i, y_i, z)."
     g = np.zeros((N, N, Z))
     for i,j in G.edges():
         for z in xrange(Z):
@@ -203,6 +211,7 @@ if __name__ == '__main__':
     del w
     
     # 1.2 Calculate b_ij^z according to Eq. 8.
+    print "1.2 Calculate b_ij^z according to Eq. 8."
     b = np.zeros((N, N, Z))
     for i,j in G.edges():
         for z in xrange(Z):
@@ -211,15 +220,18 @@ if __name__ == '__main__':
     del g
     
     # 1.3 Initalize all {r_ij^z} <- 0.
+    print "1.3 Initalize all {r_ij^z} <- 0."
     r = np.zeros((N, N, Z))
     a = np.zeros((N, N, Z))
     
-    # Crude way to watch for coalescence.
-    r_m = []
+    # 1.4. Start iterations.
+    print "1.4. Start iterations."
+    r_m = []    # Crude way to watch for coalescence.
     
     iterations = 50
-    
     for i in xrange(iterations):
+        if i % 10 == 0:
+            print "iteration " + str(i) + ": " + str(np.mean(r))
         iterate()
         r_m.append(np.mean(r))
     
@@ -227,6 +239,9 @@ if __name__ == '__main__':
     #   Compute mu_st for each pair of neighboring nodes.
     #   Generate G_z = (V_z, E_z) for every topic z according to {mu_st}.
     
+    print "1.15 - 1.20"
+    print "Compute mu_st for each pair of neighboring nodes."
+    print "Generate G_z = (V_z, E_z) for every topic z according to {mu_st}."
     with open("./evo_devo.csv", "w") as f:
         for i,j in G.edges():
             f.write("\t".join([ str(i),str(j)] + 
@@ -242,5 +257,5 @@ if __name__ == '__main__':
             f.write( "\t".join([ str(i)] + 
                                [ str(theta[i,z]) 
                                   for z in xrange(Z) ]) + "\n")
-                                  
+    print "Done."
     # TODO: pruning networks
